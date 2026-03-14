@@ -1,7 +1,314 @@
 ﻿@page "/"
+@using MudBlazor.Utilities
 
-<PageTitle>Home</PageTitle>
+<PageTitle>@CurrentParent</PageTitle>
 
-<h1>Hello, world!</h1>
+<MudToolBar Gutters="false">
+    <MudIconButton OnClick="NavigateUp" Icon="@Icons.Material.Filled.ArrowUpward" />
+    <MudTextField Variant="Variant.Outlined" Label="Current Directory" @bind-Value="@CurrentPath"
+                  Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Forward" OnAdornmentClick="LoadCurrent" />
+    <MudToggleIconButton Toggled="@ShowHidden" Icon="@Icons.Material.Filled.Visibility" ToggledIcon="@Icons.Material.Filled.VisibilityOff" />
+    <MudButtonGroup OverrideStyles="false">
+        <MudIconButton Color="CurrentLayout == Layout.Grid ? Color.Primary : Color.Surface" OnClick="() => CurrentLayout = Layout.Grid"  Icon="@Icons.Material.Filled.GridView" />
+        <MudIconButton Color="CurrentLayout == Layout.Table ? Color.Primary : Color.Surface" OnClick="() => CurrentLayout = Layout.Table" Icon="@Icons.Material.Filled.TableChart" />
+        <MudIconButton Color="CurrentLayout == Layout.List ? Color.Primary : Color.Surface" OnClick="() => CurrentLayout = Layout.List"  Icon="@Icons.Material.Filled.ViewList" />
+    </MudButtonGroup>
+</MudToolBar>
 
-Welcome to your new app.
+<MudToolBar>
+    <MudStack Spacing="0">
+        <MudText>
+            @CurrentParent: @Contents.Count(x => x is DirectoryInfo) folders, @Contents.Count(x => x is FileInfo) files
+        </MudText>
+        <MudText>
+            @Selected.Count selected
+        </MudText>
+    </MudStack>
+    
+    
+    <MudTooltip Text="Delete">
+        <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="DeleteClicked" />
+    </MudTooltip>
+    
+    <MudTooltip Text="New Folder">
+        <MudIconButton Icon="@Icons.Material.Filled.CreateNewFolder" OnClick="CreateNewFolder" />
+    </MudTooltip>
+    
+    <MudTooltip Text="Refresh">
+        <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="Refresh" />
+    </MudTooltip>
+    
+    <MudTooltip Text="Deselect (Esc)">
+        <MudIconButton Icon="@Icons.Material.Filled.Deselect" OnClick="EscapePressed" />
+    </MudTooltip>
+    
+    <MudTooltip Text="Rename (F2)">
+        <MudIconButton Icon="@Icons.Material.Filled.DriveFileRenameOutline" OnClick="Rename" />
+    </MudTooltip>
+</MudToolBar>
+
+
+<br/>
+<br/>
+
+@if (CurrentLayout == Layout.List)
+{
+    @if (!IsRoot)
+    {
+        <MudTextField ReadOnly Underline="false" Value="@("..Parent")" Adornment="Adornment.Start" OnAdornmentClick="NavigateUp"
+                  AdornmentIcon="@Icons.Material.Filled.DriveFolderUpload" />
+    }
+
+    @foreach (var entry in Contents.OrderByDescending( x=> x is DirectoryInfo).ThenBy(x => x.Name))
+    {
+        <MudTextField ReadOnly Underline="false" Value="@entry.Name" Adornment="Adornment.Start" OnAdornmentClick="() => Clicked(entry)"
+                      AdornmentIcon="@(entry is DirectoryInfo ? Icons.Material.Filled.Folder : Icons.Material.Filled.Description)" />
+    }
+}
+else if (CurrentLayout == Layout.Grid)
+{
+    <MudText>Grid</MudText>
+}
+else if (CurrentLayout == Layout.Table)
+{
+    
+    <MudHotkey Key="JsKey.Escape" OnHotkeyPressed="EscapePressed"/>
+    
+    <MudTable T="FileSystemInfo" Items="@Contents" OnRowClick="TableRowClick" RowClassFunc="RowClassFunc" >
+        <ColGroup>
+            <col style="width: 60px;" />
+            <col />
+            <col />
+            <col />
+            <col />
+            <col />
+        </ColGroup>
+        <HeaderContent>
+            <MudTh></MudTh>
+            <MudTh>File Name</MudTh>
+            <MudTh>Extension</MudTh>
+            <MudTh>Created</MudTh>
+            <MudTh>Modified</MudTh>
+            <MudTh>Size</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd><MudIcon Icon="@(context is DirectoryInfo ? Icons.Material.Filled.Folder : Icons.Material.Filled.Description)" /></MudTd>
+            <MudTd>@context.Name</MudTd>
+            <MudTd>@(context is FileInfo ? context.Extension : "")</MudTd>
+            <MudTd>@context.CreationTime</MudTd>
+            <MudTd>@context.LastWriteTime</MudTd>
+            <MudTd>@(context is FileInfo f ? FormatBytes(f.Length) : "")</MudTd>
+        </RowTemplate>
+        
+    </MudTable>
+}
+
+@code {
+    
+    string CurrentParent => string.IsNullOrWhiteSpace(Path.GetFileName(CurrentPath)) ? "Root" : Path.GetFileName(CurrentPath);
+
+    string FormatBytes(long length)
+    {
+        if (length < 1024) return $"{length} B";
+        if (length < 1024 * 1024) return $"{length / 1024d:F2} KB";
+        if (length < 1024L * 1024 * 1024) return $"{length / 1024d / 1024:F2} MB";
+        if (length < 1024L * 1024 * 1024 * 1024) return $"{length / 1024d / 1024 / 1024:F2} GB";
+        return $"{length / 1024d / 1024 / 1024 / 1024:F2} TB";
+    }
+    
+    enum Layout
+    {
+        Grid,
+        List,
+        Table
+    }
+    
+    Layout CurrentLayout = Layout.Table;
+
+    bool ShowHidden
+    {
+        get => field;
+        set { field = value; LoadCurrent(); }
+    }
+
+    bool IsRoot =>
+        Path.GetFullPath(CurrentPath) ==
+        Path.GetFullPath(Directory.GetDirectoryRoot(CurrentPath)!);
+    
+    string CurrentPath = Directory.GetDirectoryRoot(Environment.CurrentDirectory);
+    
+    List<FileSystemInfo> Contents = [];
+    
+    void Clicked(FileSystemInfo entry)
+    {
+        if (entry is DirectoryInfo file)
+        {
+            CurrentPath = file.FullName;
+            LoadCurrent();
+        }
+    }
+    
+    void NavigateUp()
+    {
+        if (IsRoot) return;
+        CurrentPath = Directory.GetParent(CurrentPath)?.FullName ?? CurrentPath;
+        LoadCurrent();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        LoadCurrent();
+    }
+
+    void LoadCurrent()
+    {
+        try
+        {
+            var dir = new DirectoryInfo(CurrentPath);
+
+            Contents =
+            [
+                ..dir.EnumerateFileSystemInfos()
+                    .Where(f => ShowHidden || (!f.Attributes.HasFlag(FileAttributes.Hidden) && !f.Attributes.HasFlag(FileAttributes.System)))        
+                    .OrderBy(x => x is FileInfo)
+                    .ThenBy(x => x.Name)];
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Snackbar.Add($"Access denied to {CurrentPath}", Severity.Warning);
+            NavigateUp();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    bool isModifier(MouseEventArgs mouseEvent)
+    {
+        return mouseEvent.AltKey || mouseEvent.CtrlKey || mouseEvent.ShiftKey || mouseEvent.MetaKey;
+    }
+
+    bool isDouble(MouseEventArgs mouseEventArgs)
+    {
+        return mouseEventArgs.Detail > 1;
+    }
+
+    private void TableRowClick(TableRowClickEventArgs<FileSystemInfo> ev)
+    {
+        if (ev.Item is DirectoryInfo && isDouble(ev.MouseEventArgs) && !isModifier(ev.MouseEventArgs))
+        {
+            CurrentPath = ev.Item.FullName;
+            LoadCurrent();
+            return;
+        }
+
+        var ordered = Contents
+            .OrderByDescending(x => x is DirectoryInfo)
+            .ThenBy(x => x.Name)
+            .ToList();
+
+        if (!isModifier(ev.MouseEventArgs))
+        {
+            Selected.Clear();
+            Selected.Add(ev.Item);
+            lastClicked = ev.Item;
+            return;
+        }
+
+        if (ev.MouseEventArgs.CtrlKey && !ev.MouseEventArgs.ShiftKey)
+        {
+            if (!Selected.Remove(ev.Item))
+                Selected.Add(ev.Item);
+
+            lastClicked = ev.Item;
+            return;
+        }
+
+        if (ev.MouseEventArgs.ShiftKey)
+        {
+            if (lastClicked == null)
+            {
+                Selected.Add(ev.Item);
+                lastClicked = ev.Item;
+                return;
+            }
+
+            var start = ordered.IndexOf(lastClicked);
+            var end = ordered.IndexOf(ev.Item);
+
+            if (start == -1 || end == -1)
+                return;
+
+            if (start > end)
+                (start, end) = (end, start);
+
+            if (!ev.MouseEventArgs.CtrlKey)
+                Selected.Clear();
+
+            for (int i = start; i <= end; i++)
+                Selected.Add(ordered[i]);
+
+            return;
+        }
+    }
+
+    HashSet<FileSystemInfo> Selected = [];
+    FileSystemInfo? lastClicked;
+
+    private string RowClassFunc(FileSystemInfo arg1, int arg2)
+    {
+
+        if (Selected.Contains(arg1))
+        {
+            return "background-color: blue";
+        }
+        else return ""; // "background-color: blue";
+    }
+
+    private void EscapePressed(object obj)
+    {
+        Selected.Clear();
+    }
+
+    async Task DeleteClicked()
+    {
+        if (Selected.Count == 0) return;
+        string message = Selected.Count switch
+        {
+            0 => "",
+    
+            1 => Selected.First() switch
+            {
+                DirectoryInfo dir when dir.EnumerateFileSystemInfos().Any()
+                    => $"Are you sure you want to delete the folder {dir.Name} and its contents?",
+        
+                DirectoryInfo dir
+                    => $"Are you sure you want to delete the folder {dir.Name}?",
+        
+                var itm
+                    => $"Are you sure you want to delete {itm.Name}?"
+            },
+
+            _ => $"Are you sure you want to delete {Selected.Count} items?"
+        };
+
+        var res = await DialogService.ShowMessageBoxAsync("Delete!", message, "Yes", "No");
+    }
+
+    private void Refresh()
+    {
+        throw new NotImplementedException();
+    }
+
+    private void CreateNewFolder()
+    {
+        throw new NotImplementedException();
+    }
+
+    private void Rename()
+    {
+        throw new NotImplementedException();
+    }
+
+}
