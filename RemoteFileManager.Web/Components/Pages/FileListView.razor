@@ -1,0 +1,104 @@
+﻿@using MudBlazor.Utilities
+@inject SelectionManager Selection
+
+<MudHotkey Key="JsKey.Escape" OnHotkeyPressed="ClearSelection"/>
+
+<div class="file-list">
+
+    @if (!IsRoot)
+    {
+        <div class="file-row parent" @onclick="NavigateUp">
+            <MudIcon Icon="@Icons.Material.Filled.DriveFolderUpload"/>
+            <span>..Parent</span>
+        </div>
+    }
+
+    @foreach (var entry in Ordered)
+    {
+        var selected = Selection.Selected.Contains(entry.FullName);
+
+        <div class="file-row @(selected ? "selected" : "")"
+             @onclick="e => HandleClick(entry, e)">
+
+            <MudIcon Icon="@(entry is DirectoryInfo
+                               ? Icons.Material.Filled.Folder
+                               : Icons.Material.Filled.Description)" />
+
+            <span>@entry.Name</span>
+
+        </div>
+    }
+
+</div>
+
+@code {
+
+    [Parameter] public List<FileSystemInfo> Contents { get; set; } = [];
+    [Parameter] public bool IsRoot { get; set; }
+
+    [Parameter] public EventCallback<string> OpenDirectory { get; set; }
+    [Parameter] public EventCallback NavigateUp { get; set; }
+
+    IEnumerable<FileSystemInfo> Ordered =>
+        Contents
+            .OrderByDescending(x => x is DirectoryInfo)
+            .ThenBy(x => x.Name);
+
+    void HandleClick(FileSystemInfo entry, MouseEventArgs mouse)
+    {
+        var path = entry.FullName;
+
+        if (entry is DirectoryInfo && mouse.Detail > 1 && !HasModifierKeys(mouse))
+        {
+            OpenDirectory.InvokeAsync(path);
+            return;
+        }
+
+        var ordered = Ordered
+            .Select(x => x.FullName)
+            .ToList();
+
+        Selection.Click(path, mouse, ordered);
+    }
+
+    void ClearSelection()
+    {
+        Selection.Clear();
+    }
+
+    static bool HasModifierKeys(MouseEventArgs mouse)
+        => mouse.AltKey || mouse.CtrlKey || mouse.ShiftKey || mouse.MetaKey;
+
+}
+
+<style>
+    .file-list
+    {
+        user-select: none;
+    }
+
+    .file-row
+    {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        cursor: pointer;
+    }
+
+    .file-row:hover
+    {
+        background: rgba(0,0,0,0.05);
+    }
+
+    .file-row.selected
+    {
+        background: var(--mud-palette-primary);
+        color: white;
+    }
+
+    .file-row.parent
+    {
+        font-style: italic;
+    }
+</style>

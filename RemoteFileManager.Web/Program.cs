@@ -1,6 +1,8 @@
 using MudBlazor.Services;
 using RemoteFileManager.Web.Components;
 
+namespace RemoteFileManager.Web;
+
 public partial class Program
 {
     public static void Main(string[] args)
@@ -12,7 +14,10 @@ public partial class Program
             .AddInteractiveServerComponents();
         
         builder.Services.AddMudServices();
-
+        
+        builder.Services.AddScoped<FileSystemService>();
+        builder.Services.AddScoped<SelectionManager>();
+        
         var app = builder.Build();
 
 // Configure the HTTP request pipeline.

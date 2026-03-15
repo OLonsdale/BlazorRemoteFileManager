@@ -1,17 +1,36 @@
 ﻿@page "/"
 @using MudBlazor.Utilities
+@inject FileSystemService Fs
+@inject SelectionManager Selection
 
 <PageTitle>@CurrentParent</PageTitle>
 
 <MudToolBar Gutters="false">
     <MudIconButton OnClick="NavigateUp" Icon="@Icons.Material.Filled.ArrowUpward" />
-    <MudTextField Variant="Variant.Outlined" Label="Current Directory" @bind-Value="@CurrentPath"
-                  Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Forward" OnAdornmentClick="LoadCurrent" />
-    <MudToggleIconButton Toggled="@ShowHidden" Icon="@Icons.Material.Filled.Visibility" ToggledIcon="@Icons.Material.Filled.VisibilityOff" />
+
+    <MudTextField Variant="Variant.Outlined"
+                  Label="Current Directory"
+                  @bind-Value="CurrentPath"
+                  Adornment="Adornment.End"
+                  AdornmentIcon="@Icons.Material.Filled.Forward"
+                  OnAdornmentClick="LoadCurrent" />
+
+    <MudToggleIconButton Toggled="@ShowHidden"
+                         Icon="@Icons.Material.Filled.Visibility"
+                         ToggledIcon="@Icons.Material.Filled.VisibilityOff" />
+
     <MudButtonGroup OverrideStyles="false">
-        <MudIconButton Color="CurrentLayout == Layout.Grid ? Color.Primary : Color.Surface" OnClick="() => CurrentLayout = Layout.Grid"  Icon="@Icons.Material.Filled.GridView" />
-        <MudIconButton Color="CurrentLayout == Layout.Table ? Color.Primary : Color.Surface" OnClick="() => CurrentLayout = Layout.Table" Icon="@Icons.Material.Filled.TableChart" />
-        <MudIconButton Color="CurrentLayout == Layout.List ? Color.Primary : Color.Surface" OnClick="() => CurrentLayout = Layout.List"  Icon="@Icons.Material.Filled.ViewList" />
+        <MudIconButton Color="CurrentLayout == Layout.Grid ? Color.Primary : Color.Surface"
+                       OnClick="() => CurrentLayout = Layout.Grid"
+                       Icon="@Icons.Material.Filled.GridView" />
+
+        <MudIconButton Color="CurrentLayout == Layout.Table ? Color.Primary : Color.Surface"
+                       OnClick="() => CurrentLayout = Layout.Table"
+                       Icon="@Icons.Material.Filled.TableChart" />
+
+        <MudIconButton Color="CurrentLayout == Layout.List ? Color.Primary : Color.Surface"
+                       OnClick="() => CurrentLayout = Layout.List"
+                       Icon="@Icons.Material.Filled.ViewList" />
     </MudButtonGroup>
 </MudToolBar>
 
@@ -20,158 +39,126 @@
         <MudText>
             @CurrentParent: @Contents.Count(x => x is DirectoryInfo) folders, @Contents.Count(x => x is FileInfo) files
         </MudText>
+
         <MudText>
-            @Selected.Count selected
+            @Selection.Selected.Count selected
+        </MudText>
+
+        <MudText>
+            @Fs.Clipboard.Count items in clipboard
         </MudText>
     </MudStack>
-    
-    
+
     <MudTooltip Text="Delete">
-        <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="DeleteClicked" />
+        <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="DeleteClicked"/>
     </MudTooltip>
-    
+
     <MudTooltip Text="New Folder">
-        <MudIconButton Icon="@Icons.Material.Filled.CreateNewFolder" OnClick="CreateNewFolder" />
+        <MudIconButton Icon="@Icons.Material.Filled.CreateNewFolder" OnClick="CreateNewFolder"/>
     </MudTooltip>
-    
+
     <MudTooltip Text="Refresh">
-        <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="Refresh" />
+        <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="Refresh"/>
     </MudTooltip>
-    
+
     <MudTooltip Text="Deselect (Esc)">
-        <MudIconButton Icon="@Icons.Material.Filled.Deselect" OnClick="EscapePressed" />
+        <MudIconButton Icon="@Icons.Material.Filled.Deselect" OnClick="EscapePressed"/>
     </MudTooltip>
-    
+
     <MudTooltip Text="Rename (F2)">
-        <MudIconButton Icon="@Icons.Material.Filled.DriveFileRenameOutline" OnClick="Rename" />
+        <MudIconButton Icon="@Icons.Material.Filled.DriveFileRenameOutline" OnClick="RenameSelected"/>
+    </MudTooltip>
+
+    <MudTooltip Text="Cut">
+        <MudIconButton Icon="@Icons.Material.Filled.ContentCut" OnClick="CutSelected"/>
+    </MudTooltip>
+
+    <MudTooltip Text="Copy">
+        <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" OnClick="CopySelected"/>
+    </MudTooltip>
+
+    <MudTooltip Text="Paste">
+        <MudIconButton Icon="@Icons.Material.Filled.ContentPasteGo" OnClick="PasteSelected"/>
     </MudTooltip>
 </MudToolBar>
-
 
 <br/>
 <br/>
 
 @if (CurrentLayout == Layout.List)
 {
-    @if (!IsRoot)
-    {
-        <MudTextField ReadOnly Underline="false" Value="@("..Parent")" Adornment="Adornment.Start" OnAdornmentClick="NavigateUp"
-                  AdornmentIcon="@Icons.Material.Filled.DriveFolderUpload" />
-    }
-
-    @foreach (var entry in Contents.OrderByDescending( x=> x is DirectoryInfo).ThenBy(x => x.Name))
-    {
-        <MudTextField ReadOnly Underline="false" Value="@entry.Name" Adornment="Adornment.Start" OnAdornmentClick="() => Clicked(entry)"
-                      AdornmentIcon="@(entry is DirectoryInfo ? Icons.Material.Filled.Folder : Icons.Material.Filled.Description)" />
-    }
+    <FileListView
+        Contents="Contents"
+        IsRoot="IsRoot"
+        NavigateUp="NavigateUp"
+        OpenDirectory="OpenDirectory" />
 }
 else if (CurrentLayout == Layout.Grid)
 {
-    <MudText>Grid</MudText>
+    <FileGridView
+        Contents="Contents"
+        OpenDirectory="OpenDirectory" />
 }
 else if (CurrentLayout == Layout.Table)
 {
-    
-    <MudHotkey Key="JsKey.Escape" OnHotkeyPressed="EscapePressed"/>
-    
-    <MudTable T="FileSystemInfo" Items="@Contents" OnRowClick="TableRowClick" RowClassFunc="RowClassFunc" >
-        <ColGroup>
-            <col style="width: 60px;" />
-            <col />
-            <col />
-            <col />
-            <col />
-            <col />
-        </ColGroup>
-        <HeaderContent>
-            <MudTh></MudTh>
-            <MudTh>File Name</MudTh>
-            <MudTh>Extension</MudTh>
-            <MudTh>Created</MudTh>
-            <MudTh>Modified</MudTh>
-            <MudTh>Size</MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd><MudIcon Icon="@(context is DirectoryInfo ? Icons.Material.Filled.Folder : Icons.Material.Filled.Description)" /></MudTd>
-            <MudTd>@context.Name</MudTd>
-            <MudTd>@(context is FileInfo ? context.Extension : "")</MudTd>
-            <MudTd>@context.CreationTime</MudTd>
-            <MudTd>@context.LastWriteTime</MudTd>
-            <MudTd>@(context is FileInfo f ? FormatBytes(f.Length) : "")</MudTd>
-        </RowTemplate>
-        
-    </MudTable>
+    <FileTableView
+        Contents="Contents"
+        OpenDirectory="OpenDirectory" />
 }
 
 @code {
-    
-    string CurrentParent => string.IsNullOrWhiteSpace(Path.GetFileName(CurrentPath)) ? "Root" : Path.GetFileName(CurrentPath);
 
-    string FormatBytes(long length)
+    void OpenDirectory(string path)
     {
-        if (length < 1024) return $"{length} B";
-        if (length < 1024 * 1024) return $"{length / 1024d:F2} KB";
-        if (length < 1024L * 1024 * 1024) return $"{length / 1024d / 1024:F2} MB";
-        if (length < 1024L * 1024 * 1024 * 1024) return $"{length / 1024d / 1024 / 1024:F2} GB";
-        return $"{length / 1024d / 1024 / 1024 / 1024:F2} TB";
+        Selection.Clear();
+        CurrentPath = path;
+        LoadCurrent();
     }
-    
+
+    string CurrentParent =>
+        string.IsNullOrWhiteSpace(Path.GetFileName(CurrentPath))
+            ? "Root"
+            : Path.GetFileName(CurrentPath);
+
     enum Layout
     {
         Grid,
         List,
         Table
     }
-    
+
     Layout CurrentLayout = Layout.Table;
 
     bool ShowHidden
     {
         get => field;
-        set { field = value; LoadCurrent(); }
+        set
+        {
+            field = value;
+            LoadCurrent();
+        }
     }
 
     bool IsRoot =>
         Path.GetFullPath(CurrentPath) ==
         Path.GetFullPath(Directory.GetDirectoryRoot(CurrentPath)!);
-    
-    string CurrentPath = Directory.GetDirectoryRoot(Environment.CurrentDirectory);
-    
-    List<FileSystemInfo> Contents = [];
-    
-    void Clicked(FileSystemInfo entry)
-    {
-        if (entry is DirectoryInfo file)
-        {
-            CurrentPath = file.FullName;
-            LoadCurrent();
-        }
-    }
-    
-    void NavigateUp()
-    {
-        if (IsRoot) return;
-        CurrentPath = Directory.GetParent(CurrentPath)?.FullName ?? CurrentPath;
-        LoadCurrent();
-    }
 
-    protected override async Task OnInitializedAsync()
+    string CurrentPath = Directory.GetDirectoryRoot(Environment.CurrentDirectory);
+
+    List<FileSystemInfo> Contents = [];
+
+    protected override Task OnInitializedAsync()
     {
         LoadCurrent();
+        return Task.CompletedTask;
     }
 
     void LoadCurrent()
     {
         try
         {
-            var dir = new DirectoryInfo(CurrentPath);
-
-            Contents =
-            [
-                ..dir.EnumerateFileSystemInfos()
-                    .Where(f => ShowHidden || (!f.Attributes.HasFlag(FileAttributes.Hidden) && !f.Attributes.HasFlag(FileAttributes.System)))        
-                    .OrderBy(x => x is FileInfo)
-                    .ThenBy(x => x.Name)];
+            Selection.Clear();
+            Contents = Fs.GetDirectoryContents(CurrentPath, ShowHidden);
         }
         catch (UnauthorizedAccessException)
         {
@@ -184,131 +171,144 @@ else if (CurrentLayout == Layout.Table)
         }
     }
 
-    bool isModifier(MouseEventArgs mouseEvent)
+    void NavigateUp()
     {
-        return mouseEvent.AltKey || mouseEvent.CtrlKey || mouseEvent.ShiftKey || mouseEvent.MetaKey;
+        if (IsRoot) return;
+
+        Selection.Clear();
+        CurrentPath = Directory.GetParent(CurrentPath)?.FullName ?? CurrentPath;
+        LoadCurrent();
     }
 
-    bool isDouble(MouseEventArgs mouseEventArgs)
+    private void EscapePressed()
     {
-        return mouseEventArgs.Detail > 1;
-    }
-
-    private void TableRowClick(TableRowClickEventArgs<FileSystemInfo> ev)
-    {
-        if (ev.Item is DirectoryInfo && isDouble(ev.MouseEventArgs) && !isModifier(ev.MouseEventArgs))
-        {
-            CurrentPath = ev.Item.FullName;
-            LoadCurrent();
-            return;
-        }
-
-        var ordered = Contents
-            .OrderByDescending(x => x is DirectoryInfo)
-            .ThenBy(x => x.Name)
-            .ToList();
-
-        if (!isModifier(ev.MouseEventArgs))
-        {
-            Selected.Clear();
-            Selected.Add(ev.Item);
-            lastClicked = ev.Item;
-            return;
-        }
-
-        if (ev.MouseEventArgs.CtrlKey && !ev.MouseEventArgs.ShiftKey)
-        {
-            if (!Selected.Remove(ev.Item))
-                Selected.Add(ev.Item);
-
-            lastClicked = ev.Item;
-            return;
-        }
-
-        if (ev.MouseEventArgs.ShiftKey)
-        {
-            if (lastClicked == null)
-            {
-                Selected.Add(ev.Item);
-                lastClicked = ev.Item;
-                return;
-            }
-
-            var start = ordered.IndexOf(lastClicked);
-            var end = ordered.IndexOf(ev.Item);
-
-            if (start == -1 || end == -1)
-                return;
-
-            if (start > end)
-                (start, end) = (end, start);
-
-            if (!ev.MouseEventArgs.CtrlKey)
-                Selected.Clear();
-
-            for (int i = start; i <= end; i++)
-                Selected.Add(ordered[i]);
-
-            return;
-        }
-    }
-
-    HashSet<FileSystemInfo> Selected = [];
-    FileSystemInfo? lastClicked;
-
-    private string RowClassFunc(FileSystemInfo arg1, int arg2)
-    {
-
-        if (Selected.Contains(arg1))
-        {
-            return "background-color: blue";
-        }
-        else return ""; // "background-color: blue";
-    }
-
-    private void EscapePressed(object obj)
-    {
-        Selected.Clear();
+        Selection.Clear();
     }
 
     async Task DeleteClicked()
     {
-        if (Selected.Count == 0) return;
-        string message = Selected.Count switch
-        {
-            0 => "",
-    
-            1 => Selected.First() switch
-            {
-                DirectoryInfo dir when dir.EnumerateFileSystemInfos().Any()
-                    => $"Are you sure you want to delete the folder {dir.Name} and its contents?",
-        
-                DirectoryInfo dir
-                    => $"Are you sure you want to delete the folder {dir.Name}?",
-        
-                var itm
-                    => $"Are you sure you want to delete {itm.Name}?"
-            },
+        if (Selection.Selected.Count == 0) return;
 
-            _ => $"Are you sure you want to delete {Selected.Count} items?"
-        };
+        var message = Selection.Selected.Count == 1
+            ? $"Delete {Path.GetFileName(Selection.Selected.First())}?"
+            : $"Delete {Selection.Selected.Count} items?";
 
-        var res = await DialogService.ShowMessageBoxAsync("Delete!", message, "Yes", "No");
+        var res = await DialogService.ShowMessageBoxAsync("Delete", message, "Yes", "No");
+
+        if (res != true) return;
+
+        var results = Fs.Delete(Selection.Selected);
+
+        foreach (var r in results.Where(x => !x.Success))
+            Snackbar.Add(r.Error, Severity.Error);
+
+        Selection.Clear();
+        LoadCurrent();
     }
 
     private void Refresh()
     {
-        throw new NotImplementedException();
+        LoadCurrent();
     }
 
-    private void CreateNewFolder()
+    private async Task CreateNewFolder()
     {
-        throw new NotImplementedException();
+        var existing = Fs.GetNames(CurrentPath);
+
+        string baseName = "New Folder";
+        string name = baseName;
+        int i = 2;
+
+        while (existing.Contains(name))
+        {
+            name = $"{baseName} ({i})";
+            i++;
+        }
+
+        var dialog = await DialogService.ShowAsync<TextPromptDialog>(
+            "New Folder",
+            new DialogParameters<TextPromptDialog>
+            {
+                { x => x.InitialValue, name },
+                { x => x.Label, "New name" },
+                { x => x.DisallowedValues, existing }
+            });
+
+        var result = await dialog.Result;
+
+        if (result?.Canceled == true) return;
+        if (result?.Data is not string newName) return;
+
+        var op = Fs.CreateFolder(CurrentPath, newName);
+
+        if (!op.Success)
+            Snackbar.Add(op.Error, Severity.Error);
+
+        LoadCurrent();
     }
 
-    private void Rename()
+    private async void RenameSelected()
     {
-        throw new NotImplementedException();
+        if (Selection.Selected.Count != 1)
+        {
+            Snackbar.Add("Select exactly one item.", Severity.Warning);
+            return;
+        }
+
+        var path = Selection.Selected.First();
+
+        var existing = Fs.GetNames(CurrentPath);
+
+        var dialog = await DialogService.ShowAsync<TextPromptDialog>(
+            "Rename",
+            new DialogParameters<TextPromptDialog>
+            {
+                { x => x.InitialValue, Path.GetFileName(path) },
+                { x => x.Label, "New name" },
+                { x => x.DisallowedValues, existing }
+            });
+
+        var result = await dialog.Result;
+
+        if (result?.Canceled == true) return;
+        if (result?.Data is not string newName) return;
+
+        var op = Fs.Rename(path, newName);
+
+        if (!op.Success)
+            Snackbar.Add(op.Error, Severity.Error);
+
+        Selection.Clear();
+        LoadCurrent();
+    }
+
+    private void CopySelected()
+    {
+        if (Selection.Selected.Count == 0) return;
+
+        Fs.Copy(Selection.Selected);
+
+        Snackbar.Add($"{Selection.Selected.Count} item(s) copied", Severity.Info);
+    }
+
+    private void CutSelected()
+    {
+        if (Selection.Selected.Count == 0) return;
+
+        Fs.Cut(Selection.Selected);
+
+        Snackbar.Add($"{Selection.Selected.Count} item(s) cut", Severity.Info);
+    }
+
+    private void PasteSelected()
+    {
+        var results = Fs.Paste(CurrentPath);
+
+        foreach (var r in results.Where(x => !x.Success))
+            Snackbar.Add(r.Error, Severity.Error);
+
+        Selection.Clear();
+        LoadCurrent();
     }
 
 }

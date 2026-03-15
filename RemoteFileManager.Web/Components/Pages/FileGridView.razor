@@ -1,0 +1,104 @@
+﻿@using MudBlazor.Utilities
+@inject SelectionManager Selection
+
+<MudHotkey Key="JsKey.Escape" OnHotkeyPressed="ClearSelection"/>
+
+<style>
+    .file-tile {
+        height: 120px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+    }
+
+    .file-name {
+        margin-top: 8px;
+        text-align: center;
+
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+
+        overflow: hidden;
+        word-break: break-word;
+    }
+</style>
+
+<MudGrid Spacing="2">
+
+    @foreach (var entry in Ordered)
+    {
+        var selected = Selection.Selected.Contains(entry.FullName);
+
+        <MudItem xs="6" sm="4" md="3" lg="2">
+
+            <MudPaper Class="file-tile"
+                      Style="@GetStyle(selected)"
+                      Elevation="1"
+                      @onclick="e => HandleClick(entry, e)">
+
+                <MudIcon Size="Size.Large"
+                         Icon="@(entry is DirectoryInfo
+                                   ? Icons.Material.Filled.Folder
+                                   : Icons.Material.Filled.Description)" />
+
+                <MudTooltip Text="@entry.Name">
+                    <MudText Typo="Typo.body2"
+                             Align="Align.Center"
+                             Class="file-name">
+                        @entry.Name
+                    </MudText>
+                </MudTooltip>
+
+            </MudPaper>
+
+        </MudItem>
+    }
+
+</MudGrid>
+
+@code {
+
+    [Parameter] public List<FileSystemInfo> Contents { get; set; } = [];
+    
+    [Parameter] public EventCallback<string> OpenDirectory { get; set; }
+    
+    IEnumerable<FileSystemInfo> Ordered =>
+        Contents
+            .OrderByDescending(x => x is DirectoryInfo)
+            .ThenBy(x => x.Name);
+
+    void HandleClick(FileSystemInfo entry, MouseEventArgs mouse)
+    {
+        var path = entry.FullName;
+
+        if (entry is DirectoryInfo && mouse.Detail > 1 && !HasModifierKeys(mouse))
+        {
+            OpenDirectory.InvokeAsync(path);
+            return;
+        }
+
+        var ordered = Ordered
+            .Select(x => x.FullName)
+            .ToList();
+
+        Selection.Click(path, mouse, ordered);
+        
+    }
+
+    void ClearSelection()
+    {
+        Selection.Clear();
+    }
+
+    string GetStyle(bool selected)
+        => selected
+            ? "background-color: var(--mud-palette-primary); color:white; cursor:pointer"
+            : "cursor:pointer";
+
+    static bool HasModifierKeys(MouseEventArgs mouse)
+        => mouse.AltKey || mouse.CtrlKey || mouse.ShiftKey || mouse.MetaKey;
+
+}

@@ -1,0 +1,48 @@
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="value"
+                      Label="@Label"
+                      Immediate="true"
+                      Error="@IsInvalid"
+                      ErrorText="That name is not allowed" />
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="@IsInvalid">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter] public string InitialValue { get; set; } = "";
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public IEnumerable<string> DisallowedValues { get; set; } = [];
+
+    private string value = "";
+    private HashSet<string> disallowed = [];
+
+    private bool IsInvalid =>
+        string.IsNullOrWhiteSpace(value) ||
+        disallowed.Contains(value);
+
+    protected override void OnParametersSet()
+    {
+        value = InitialValue;
+
+        disallowed = DisallowedValues
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private void Submit()
+    {
+        if (IsInvalid) return;
+        MudDialog.Close(DialogResult.Ok(value));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

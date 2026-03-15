@@ -1,0 +1,88 @@
+﻿@using MudBlazor.Utilities
+@using RemoteFileManager.Web.Statics
+@inject SelectionManager Selection
+
+<MudHotkey Key="JsKey.Escape" OnHotkeyPressed="ClearSelection"/>
+
+<MudTable T="FileSystemInfo"
+          Items="Contents"
+          OnRowClick="HandleRowClick"
+          RowClassFunc="RowClassFunc">
+
+    <ColGroup>
+        <col style="width:60px"/>
+        <col/>
+        <col/>
+        <col/>
+        <col/>
+        <col/>
+    </ColGroup>
+
+    <HeaderContent>
+        <MudTh></MudTh>
+        <MudTh>File Name</MudTh>
+        <MudTh>Extension</MudTh>
+        <MudTh>Created</MudTh>
+        <MudTh>Modified</MudTh>
+        <MudTh>Size</MudTh>
+    </HeaderContent>
+
+    <RowTemplate>
+        <MudTd>
+            <MudIcon Icon="@(context is DirectoryInfo
+                ? Icons.Material.Filled.Folder
+                : Icons.Material.Filled.Description)" />
+        </MudTd>
+
+        <MudTd>@context.Name</MudTd>
+        <MudTd>@(context is FileInfo ? context.Extension : "")</MudTd>
+        <MudTd>@context.CreationTime</MudTd>
+        <MudTd>@context.LastWriteTime</MudTd>
+        <MudTd>@(context is FileInfo f ? FormatBytes.Format(f.Length) : "")</MudTd>
+    </RowTemplate>
+
+</MudTable>
+
+@code {
+
+    [Parameter] public List<FileSystemInfo> Contents { get; set; } = [];
+    
+    [Parameter] public EventCallback<string> OpenDirectory { get; set; }
+    
+    private void HandleRowClick(TableRowClickEventArgs<FileSystemInfo> ev)
+    {
+        if (ev.Item is null) return;
+
+        var item = ev.Item;
+        var mouse = ev.MouseEventArgs;
+        var path = item.FullName;
+
+        if (item is DirectoryInfo && mouse.Detail > 1 && !HasModifierKeys(mouse))
+        {
+            OpenDirectory.InvokeAsync(path);
+            return;
+        }
+
+        var ordered = Contents
+            .OrderByDescending(x => x is DirectoryInfo)
+            .ThenBy(x => x.Name)
+            .Select(x => x.FullName)
+            .ToList();
+
+        Selection.Click(path, mouse, ordered);
+    }
+
+    private void ClearSelection()
+    {
+        Selection.Clear();
+    }
+
+    private string RowClassFunc(FileSystemInfo item, int index)
+        => Selection.Selected.Contains(item.FullName)
+            ? "background-color: blue"
+            : "";
+
+    static bool HasModifierKeys(MouseEventArgs mouse)
+        => mouse.AltKey || mouse.CtrlKey || mouse.ShiftKey || mouse.MetaKey;
+
+}
