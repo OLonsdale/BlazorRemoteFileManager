@@ -1,4 +1,4 @@
-﻿namespace RemoteFileManager.Web;
+﻿namespace RemoteFileManager.Web.Services;
 
 public class FileSystemService
 {
@@ -10,6 +10,7 @@ public class FileSystemService
     private bool _isCut;
 
     public IReadOnlyList<ClipboardItem> Clipboard => _clipboard;
+    public void ClearClipboard() => _clipboard.Clear();
 
     public bool ClipboardIsCut => _isCut;
 

@@ -1,0 +1,123 @@
+﻿@using RemoteFileManager.Web.Statics
+
+<MudDialog>
+    <DialogContent>
+
+        <MudText Typo="Typo.h6" Class="mb-2">@FileSystemInfo.Name</MudText>
+
+        <MudSimpleTable Dense="true">
+            <tbody>
+
+            <tr>
+                <td>Type</td>
+                <td>@Type</td>
+            </tr>
+
+            @if (IsFile)
+            {
+                <tr>
+                    <td>Extension</td>
+                    <td>@File.Extension</td>
+                </tr>
+            }
+
+            <tr>
+                <td>Size</td>
+                <td>@SizeText</td>
+            </tr>
+
+            <tr>
+                <td>Path</td>
+                <td>@FileSystemInfo.FullName</td>
+            </tr>
+
+            <tr>
+                <td>Created</td>
+                <td>@FileSystemInfo.CreationTime</td>
+            </tr>
+
+            <tr>
+                <td>Modified</td>
+                <td>@FileSystemInfo.LastWriteTime</td>
+            </tr>
+
+            <tr>
+                <td>Accessed</td>
+                <td>@FileSystemInfo.LastAccessTime</td>
+            </tr>
+
+            <tr>
+                <td>Attributes</td>
+                <td>@AttributesText</td>
+            </tr>
+
+            <tr>
+                <td>Exists</td>
+                <td>@FileSystemInfo.Exists</td>
+            </tr>
+
+            </tbody>
+        </MudSimpleTable>
+
+    </DialogContent>
+</MudDialog>
+
+@code {
+
+    [Parameter, EditorRequired]
+    public FileSystemInfo FileSystemInfo { get; set; }
+
+    bool IsFile => FileSystemInfo is FileInfo;
+    FileInfo File => (FileInfo)FileSystemInfo;
+
+    string Type => IsFile ? "File" : "Folder";
+
+    string SizeText = "Calculating...";
+    
+    string AttributesText =>
+        string.Join(", ",
+            new[]
+                {
+                    FileAttributes.ReadOnly,
+                    FileAttributes.Hidden,
+                    FileAttributes.System,
+                    FileAttributes.Archive,
+                    FileAttributes.Compressed,
+                    FileAttributes.Encrypted
+                }
+                .Where(a => FileSystemInfo.Attributes.HasFlag(a))
+                .Select(a => a.ToString()));
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (FileSystemInfo is FileInfo fi)
+        {
+            SizeText = FormatBytes.Format(fi.Length);
+        }
+        else if (FileSystemInfo is DirectoryInfo di)
+        {
+            var size = await Task.Run(() => GetDirectorySize(di));
+            SizeText = FormatBytes.Format(size);
+        }
+    }
+
+    static long GetDirectorySize(DirectoryInfo dir)
+    {
+        long size = 0;
+
+        try
+        {
+            foreach (var file in dir.EnumerateFiles())
+                size += file.Length;
+
+            foreach (var sub in dir.EnumerateDirectories())
+                size += GetDirectorySize(sub);
+        }
+        catch
+        {
+        }
+
+        return size;
+    }
+
+}

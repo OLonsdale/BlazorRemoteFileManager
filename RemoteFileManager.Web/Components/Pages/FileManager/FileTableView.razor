@@ -1,4 +1,5 @@
 ﻿@using MudBlazor.Utilities
+@using RemoteFileManager.Web.Services
 @using RemoteFileManager.Web.Statics
 @inject SelectionManager Selection
 
@@ -29,9 +30,7 @@
 
     <RowTemplate>
         <MudTd>
-            <MudIcon Icon="@(context is DirectoryInfo
-                ? Icons.Material.Filled.Folder
-                : Icons.Material.Filled.Description)" />
+            <MudIcon Icon="@FileIcon.Get(context)" />
         </MudTd>
 
         <MudTd>@context.Name</MudTd>
@@ -42,6 +41,14 @@
     </RowTemplate>
 
 </MudTable>
+
+<style>
+    .selected
+    {
+        background: var(--mud-palette-primary);
+        color: white;
+    }
+</style>
 
 @code {
 
@@ -79,7 +86,7 @@
 
     private string RowClassFunc(FileSystemInfo item, int index)
         => Selection.Selected.Contains(item.FullName)
-            ? "background-color: blue"
+            ? "selected"
             : "";
 
     static bool HasModifierKeys(MouseEventArgs mouse)

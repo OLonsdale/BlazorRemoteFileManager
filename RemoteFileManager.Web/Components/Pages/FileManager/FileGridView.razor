@@ -1,4 +1,6 @@
 ﻿@using MudBlazor.Utilities
+@using RemoteFileManager.Web.Services
+@using RemoteFileManager.Web.Statics
 @inject SelectionManager Selection
 
 <MudHotkey Key="JsKey.Escape" OnHotkeyPressed="ClearSelection"/>
@@ -40,9 +42,7 @@
                       @onclick="e => HandleClick(entry, e)">
 
                 <MudIcon Size="Size.Large"
-                         Icon="@(entry is DirectoryInfo
-                                   ? Icons.Material.Filled.Folder
-                                   : Icons.Material.Filled.Description)" />
+                         Icon="@FileIcon.Get(entry)" />
 
                 <MudTooltip Text="@entry.Name">
                     <MudText Typo="Typo.body2"

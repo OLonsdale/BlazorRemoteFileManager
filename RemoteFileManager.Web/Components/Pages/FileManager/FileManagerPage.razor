@@ -1,53 +1,66 @@
 ﻿@page "/"
-@using MudBlazor.Utilities
+@using RemoteFileManager.Web.Services
 @inject FileSystemService Fs
 @inject SelectionManager Selection
 
 <PageTitle>@CurrentParent</PageTitle>
 
 <MudToolBar Gutters="false">
-    <MudIconButton OnClick="NavigateUp" Icon="@Icons.Material.Filled.ArrowUpward" />
+    <MudIconButton OnClick="NavigateUp" Icon="@Icons.Material.Filled.ArrowUpward"/>
 
-    <MudTextField Variant="Variant.Outlined"
-                  Label="Current Directory"
-                  @bind-Value="CurrentPath"
-                  Adornment="Adornment.End"
-                  AdornmentIcon="@Icons.Material.Filled.Forward"
-                  OnAdornmentClick="LoadCurrent" />
+    @if (ShowBreadcrumbs)
+    {
+        <MudBreadcrumbs Items="breadcrumbItems">
+            <ItemTemplate Context="item">
+                <MudLink OnClick="() => OpenDirectory(item.Href)">@item.Text</MudLink>
+            </ItemTemplate>
+        </MudBreadcrumbs>
+    }
+    else
+    {
+        <MudTextField Variant="Variant.Outlined"
+                      Label="Current Directory"
+                      @bind-Value="CurrentPath"
+                      Adornment="Adornment.End"
+                      AdornmentIcon="@Icons.Material.Filled.Forward"
+                      OnAdornmentClick="LoadCurrent"/>
+    }
 
-    <MudToggleIconButton Toggled="@ShowHidden"
-                         Icon="@Icons.Material.Filled.Visibility"
-                         ToggledIcon="@Icons.Material.Filled.VisibilityOff" />
+    <MudTooltip Text="Show Breadcrumbs">
+        <MudToggleIconButton @bind-Toggled="@ShowBreadcrumbs" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Link"
+                             ToggledIcon="@Icons.Material.Filled.LinkOff" />
+    </MudTooltip>
+
+    <MudTooltip Text="Show hidden files">
+        <MudToggleIconButton @bind-Toggled="@ShowHidden" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Visibility"
+                             ToggledIcon="@Icons.Material.Filled.VisibilityOff" />
+    </MudTooltip>
 
     <MudButtonGroup OverrideStyles="false">
-        <MudIconButton Color="CurrentLayout == Layout.Grid ? Color.Primary : Color.Surface"
-                       OnClick="() => CurrentLayout = Layout.Grid"
-                       Icon="@Icons.Material.Filled.GridView" />
+        <MudTooltip Text="Grid View">
+            <MudIconButton Variant="Variant.Outlined" Icon="@Icons.Material.Filled.GridView"
+                           Color="CurrentLayout == Layout.Grid ? Color.Primary : Color.Surface"
+                           OnClick="() => CurrentLayout = Layout.Grid" />
+        </MudTooltip>
 
-        <MudIconButton Color="CurrentLayout == Layout.Table ? Color.Primary : Color.Surface"
-                       OnClick="() => CurrentLayout = Layout.Table"
-                       Icon="@Icons.Material.Filled.TableChart" />
-
-        <MudIconButton Color="CurrentLayout == Layout.List ? Color.Primary : Color.Surface"
-                       OnClick="() => CurrentLayout = Layout.List"
-                       Icon="@Icons.Material.Filled.ViewList" />
+        <MudTooltip Text="Table View">
+            <MudIconButton Variant="Variant.Outlined" Icon="@Icons.Material.Filled.TableChart"
+                           Color="CurrentLayout == Layout.Table ? Color.Primary : Color.Surface"
+                           OnClick="() => CurrentLayout = Layout.Table" />
+        </MudTooltip>
+        <MudTooltip Text="List View">
+            <MudIconButton Variant="Variant.Outlined" Icon="@Icons.Material.Filled.ViewList"
+                           Color="CurrentLayout == Layout.List ? Color.Primary : Color.Surface"
+                           OnClick="() => CurrentLayout = Layout.List" />
+        </MudTooltip>
     </MudButtonGroup>
 </MudToolBar>
 
 <MudToolBar>
-    <MudStack Spacing="0">
-        <MudText>
-            @CurrentParent: @Contents.Count(x => x is DirectoryInfo) folders, @Contents.Count(x => x is FileInfo) files
-        </MudText>
-
-        <MudText>
-            @Selection.Selected.Count selected
-        </MudText>
-
-        <MudText>
-            @Fs.Clipboard.Count items in clipboard
-        </MudText>
-    </MudStack>
+    
+    <MudTooltip Text="Info">
+        <MudIconButton Icon="@Icons.Material.Filled.Info" OnClick="InfoClicked"/>
+    </MudTooltip>
 
     <MudTooltip Text="Delete">
         <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="DeleteClicked"/>
@@ -80,33 +93,62 @@
     <MudTooltip Text="Paste">
         <MudIconButton Icon="@Icons.Material.Filled.ContentPasteGo" OnClick="PasteSelected"/>
     </MudTooltip>
+
+    <MudTooltip Text="Clear Clipboard">
+        <MudIconButton Icon="@Icons.Material.Filled.LayersClear" OnClick="ClearClipboard"/>
+    </MudTooltip>
 </MudToolBar>
 
 <br/>
+@CurrentParent: @Contents.Count(x => x is DirectoryInfo) folders, @Contents.Count(x => x is FileInfo) files | 
+
+@Selection.Selected.Count selected |
+
+@Fs.Clipboard.Count items in clipboard
 <br/>
 
-@if (CurrentLayout == Layout.List)
+@switch (CurrentLayout)
 {
-    <FileListView
-        Contents="Contents"
-        IsRoot="IsRoot"
-        NavigateUp="NavigateUp"
-        OpenDirectory="OpenDirectory" />
-}
-else if (CurrentLayout == Layout.Grid)
-{
-    <FileGridView
-        Contents="Contents"
-        OpenDirectory="OpenDirectory" />
-}
-else if (CurrentLayout == Layout.Table)
-{
-    <FileTableView
-        Contents="Contents"
-        OpenDirectory="OpenDirectory" />
+    case Layout.List:
+        <FileListView
+            Contents="Contents"
+            IsRoot="IsRoot"
+            NavigateUp="NavigateUp"
+            OpenDirectory="OpenDirectory"/>
+        break;
+    case Layout.Grid:
+        <FileGridView
+            Contents="Contents"
+            OpenDirectory="OpenDirectory"/>
+        break;
+    case Layout.Table:
+        <FileTableView
+            Contents="Contents"
+            OpenDirectory="OpenDirectory"/>
+        break;
 }
 
 @code {
+
+    bool ShowBreadcrumbs = true;
+
+    List<BreadcrumbItem> breadcrumbItems
+    {
+        get
+        {
+            var root = Path.GetPathRoot(CurrentPath)!;
+            var parts = CurrentPath[root.Length..]
+                .Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+
+            var path = root;
+
+            return parts.Select(p =>
+            {
+                path = Path.Combine(path, p);
+                return new BreadcrumbItem(p, path, false, null);
+            }).Prepend(new BreadcrumbItem(root, root, false, null)).ToList();
+        }
+    }
 
     void OpenDirectory(string path)
     {
@@ -128,6 +170,16 @@ else if (CurrentLayout == Layout.Table)
     }
 
     Layout CurrentLayout = Layout.Table;
+    
+    protected override void OnInitialized()
+    {
+        Selection.Changed += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        Selection.Changed -= StateHasChanged;
+    }
 
     bool ShowHidden
     {
@@ -309,6 +361,42 @@ else if (CurrentLayout == Layout.Table)
 
         Selection.Clear();
         LoadCurrent();
+    }
+
+    private void ClearClipboard()
+    {
+        Fs.ClearClipboard();
+    }
+
+    private async Task InfoClicked()
+    {
+        if (Selection.Selected.Count != 1)
+        {
+            Snackbar.Add("Select exactly one item.", Severity.Warning);
+            return;
+        }
+
+        var path = Selection.Selected.Single();
+
+        FileSystemInfo info;
+    
+        if (Directory.Exists(path))
+            info = new DirectoryInfo(path);
+        else if (File.Exists(path))
+            info = new FileInfo(path);
+        else
+        {
+            Snackbar.Add("Item no longer exists.", Severity.Warning);
+            LoadCurrent();
+            return;
+        }
+
+        await DialogService.ShowAsync<InfoDialog>(
+            "Properties",
+            new DialogParameters<InfoDialog>
+            {
+                { x => x.FileSystemInfo, info }
+            });
     }
 
 }

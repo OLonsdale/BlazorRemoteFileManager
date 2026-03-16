@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Components.Web;
 
-namespace RemoteFileManager.Web;
+namespace RemoteFileManager.Web.Services;
 
 public class SelectionManager
 {
@@ -8,10 +8,15 @@ public class SelectionManager
 
     private string? _lastClicked;
 
+    public event Action? Changed;
+
+    void Notify() => Changed?.Invoke();
+
     public void Clear()
     {
         Selected.Clear();
         _lastClicked = null;
+        Notify();
     }
 
     public void Click(
@@ -27,6 +32,7 @@ public class SelectionManager
             Selected.Clear();
             Selected.Add(path);
             _lastClicked = path;
+            Notify();
             return;
         }
 
@@ -36,6 +42,7 @@ public class SelectionManager
                 Selected.Add(path);
 
             _lastClicked = path;
+            Notify();
             return;
         }
 
@@ -45,6 +52,7 @@ public class SelectionManager
             {
                 Selected.Add(path);
                 _lastClicked = path;
+                Notify();
                 return;
             }
 
@@ -62,6 +70,8 @@ public class SelectionManager
 
             for (int i = start; i <= end; i++)
                 Selected.Add(orderedPaths[i]);
+
+            Notify();
         }
     }
 }
